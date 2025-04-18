@@ -1,3 +1,8 @@
+"""
+Get all files in `io/inputs_raw` and use
+`qpdf` to remove password and save to `io/inputs_readable`.
+"""
+
 import json
 from pathlib import Path
 import shutil
@@ -18,30 +23,30 @@ def check_qpdf_installed() -> str | None:
 
 
 @op
-def get_raw_files() -> list[Path]:
-    """Return a list of files  from `inputs_raw`."""
-    raw_files_all = [*Path("./io/inputs_raw").iterdir()]
-    all_files = set(raw_files_all)
+def get_unprocessed_raw_files() -> list[Path]:
+    """Return a list of files from `inputs_raw` that haven't been processed yet."""
+    input_dir = Path("./io/inputs_raw")
+    processed_log_path = Path("./io/outputs/raw_files_results.json")
 
-    with open("io/outputs/raw_files_results.json") as file:
-        contents = file.read()
-    
-    if contents == "":
-        return raw_files_all
+    input_files = list(input_dir.iterdir())
+    input_files_set = set(input_files)
 
-    already_read: dict[str, bool] = json.loads(contents)
-    already_read_path = {Path(file) for file in already_read}
+    if not processed_log_path.exists() or processed_log_path.read_text().strip() == "":
+        return input_files
 
-    for_processing = all_files - already_read_path
+    processed_files_list = json.loads(processed_log_path.read_text())
+    processed_files_set = {Path(file) for file in processed_files_list}
 
-    return [*for_processing]
+    unprocessed_files = input_files_set - processed_files_set
+
+    return list(unprocessed_files)
 
 
 @op
 def process_raw_files(qpdf: str | None, files: list[Path] | None) -> set[str]:
     pw = Path("./creds/BPI_STATEMENT").read_text()
 
-    status = set()
+    status: set[str] = set()
     for file in files:
         filename = str(file)
         result = subprocess.run(
@@ -61,26 +66,29 @@ def process_raw_files(qpdf: str | None, files: list[Path] | None) -> set[str]:
 
 
 @op
-def store_results(results: set) -> None:
+def store_results(results: set[str]) -> None:
     """Write a JSON file to preserve files already converted."""
-    with open("./io/outputs/raw_files_results.json", "w+") as file:
-        contents = file.read()
-        if contents == "":
-            data = [*results]
-        else:
-            old_data = set(json.loads(contents))
-            data = results | old_data
-            
-        
-        data = json.dumps([*data], indent=2)
 
-        file.write(data)
+    if not results:
+        return
+
+    path = Path("./io/outputs/raw_files_results.json")
+    old_data = set()
+
+    if path.exists():
+        contents = path.read_text()
+        if contents:
+            old_data = set(json.loads(contents))
+
+    data = results | old_data
+
+    path.write_text(json.dumps(sorted(data), indent=2))
 
 
 @job
 def prepare_input_by_password_removal() -> None:
     """Remove passwords from password-protected PDFs."""
     qpdf = check_qpdf_installed()
-    raw_files = get_raw_files()
+    raw_files = get_unprocessed_raw_files()
     results = process_raw_files(qpdf, raw_files)
     store_results(results)
