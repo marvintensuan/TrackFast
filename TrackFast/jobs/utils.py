@@ -1,5 +1,8 @@
+from collections.abc import Set, KeysView
 import json
 from pathlib import Path
+
+type SetLike = Set | KeysView
 
 
 def get_input_files(file_path: str | Path) -> set[Path]:
@@ -19,7 +22,7 @@ def read_file_safely(file_name: str | Path) -> str:
 
 
 def write_all_processed_files(
-    file_name: str | Path, old_data: set, new_data: set
+    file_name: str | Path, old_data: SetLike, new_data: SetLike
 ) -> None:
     """Write a JSON file to record files already processed."""
 
@@ -29,4 +32,4 @@ def write_all_processed_files(
     sorted_data = sorted(data)
     convert_to_str = json.dumps(sorted_data, indent=2)
 
-    file.write_text(convert_to_str)
+    file.write_text(convert_to_str, encoding="utf-8")

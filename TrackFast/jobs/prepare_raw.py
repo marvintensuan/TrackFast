@@ -9,7 +9,7 @@ import shutil
 import subprocess
 from typing import Iterable
 
-from dagster import job, op
+from dagster import job, op, In, Out
 
 from TrackFast.jobs.utils import (
     get_input_files,
@@ -42,7 +42,7 @@ def get_unprocessed_raw_files() -> set[Path]:
     return files_from_inputs - existing_files
 
 
-@op
+@op(ins={"files": In(dagster_type=set)}, out={"result": Out(dagster_type=set)})
 def process_raw_files(qpdf: str, files: Iterable[Path] | None) -> set | set[str]:
     """Use `qpdf` to generate password-less files."""
 
@@ -78,7 +78,7 @@ def store_results(results: set[str]) -> None:
     if not results:
         return
 
-    path = Path("./io/outputs/raw_files_results.json")
+    path = Path("io/outputs/raw_files_results.json")
     old_data = set()
 
     if path.exists():
@@ -87,7 +87,7 @@ def store_results(results: set[str]) -> None:
             old_data = set(json.loads(contents))
 
     write_all_processed_files(
-        file_name=Path("./io/outputs/raw_files_results.json"),
+        file_name=path,
         old_data=old_data,
         new_data=results,
     )
