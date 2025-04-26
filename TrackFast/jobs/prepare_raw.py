@@ -7,8 +7,15 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+from typing import Iterable
 
 from dagster import job, op
+
+from TrackFast.jobs.utils import (
+    get_input_files,
+    read_file_safely,
+    write_all_processed_files,
+)
 
 
 @op
@@ -23,27 +30,20 @@ def check_qpdf_installed() -> str:
 
 
 @op
-def get_unprocessed_raw_files() -> list[Path]:
+def get_unprocessed_raw_files() -> set[Path]:
     """Return a list of files from `inputs_raw` that haven't been processed yet."""
-    input_dir = Path("./io/inputs_raw")
-    processed_log_path = Path("./io/outputs/raw_files_results.json")
 
-    input_files = list(input_dir.iterdir())
-    input_files_set = set(input_files)
+    files_from_inputs = get_input_files("io/inputs_raw")
 
-    if not processed_log_path.exists() or processed_log_path.read_text().strip() == "":
-        return input_files
+    contents = read_file_safely("io/outputs/raw_files_results.json")
+    processed_files: list[str] = json.loads(contents)
+    existing_files: set[Path] = {Path(file) for file in processed_files}
 
-    processed_files_list = json.loads(processed_log_path.read_text())
-    processed_files_set = {Path(file) for file in processed_files_list}
-
-    unprocessed_files = input_files_set - processed_files_set
-
-    return list(unprocessed_files)
+    return files_from_inputs - existing_files
 
 
 @op
-def process_raw_files(qpdf: str, files: list[Path] | None) -> set | set[str]:
+def process_raw_files(qpdf: str, files: Iterable[Path] | None) -> set | set[str]:
     """Use `qpdf` to generate password-less files."""
 
     pw = Path("./creds/BPI_STATEMENT").read_text()
@@ -86,9 +86,11 @@ def store_results(results: set[str]) -> None:
         if contents:
             old_data = set(json.loads(contents))
 
-    data = results | old_data
-
-    path.write_text(json.dumps(sorted(data), indent=2))
+    write_all_processed_files(
+        file_name=Path("./io/outputs/raw_files_results.json"),
+        old_data=old_data,
+        new_data=results,
+    )
 
 
 @job
