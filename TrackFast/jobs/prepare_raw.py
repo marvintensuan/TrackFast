@@ -12,7 +12,7 @@ from dagster import job, op
 
 
 @op
-def check_qpdf_installed() -> str | None:
+def check_qpdf_installed() -> str:
     """Checks if `qpdf` is installed and exists in `PATH`."""
     qpdf = shutil.which("qpdf")
 
@@ -43,10 +43,16 @@ def get_unprocessed_raw_files() -> list[Path]:
 
 
 @op
-def process_raw_files(qpdf: str | None, files: list[Path] | None) -> set[str]:
+def process_raw_files(qpdf: str, files: list[Path] | None) -> set | set[str]:
+    """Use `qpdf` to generate password-less files."""
+
     pw = Path("./creds/BPI_STATEMENT").read_text()
 
     status: set[str] = set()
+
+    if files is None:
+        return status
+
     for file in files:
         filename = str(file)
         result = subprocess.run(
