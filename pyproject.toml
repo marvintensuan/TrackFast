@@ -7,8 +7,10 @@ requires-python = ">=3.12"
 dependencies = [
     "dagster",
     "dagster-cloud",
+    "dagster-duckdb>=0.26.10",
     "dagster-webserver",
     "my-gemini-requestor",
+    "polars>=1.29.0",
 ]
 
 [project.optional-dependencies]
