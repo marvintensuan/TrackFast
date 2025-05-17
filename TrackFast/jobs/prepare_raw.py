@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
-from typing import Iterable
+from typing import Any, Iterable
 
 from dagster import job, op, In, Out
 
@@ -43,10 +43,37 @@ def get_unprocessed_raw_files() -> set[Path]:
 
 
 @op(ins={"files": In(dagster_type=set)}, out={"result": Out(dagster_type=set)})
-def process_raw_files(qpdf: str, files: Iterable[Path] | None) -> set | set[str]:
+def process_raw_files(context, qpdf: str, files: Iterable[Path] | None) -> set | set[str]:
     """Use `qpdf` to generate password-less files."""
 
-    pw = Path("./creds/BPI_STATEMENT").read_text()
+    def convert(file: Path, password: str) -> Any:
+        """Convert a file using `qpdf`."""
+        return subprocess.run(
+            [
+                qpdf,
+                f"--password={password}",
+                "--decrypt",
+                str(file),
+                f"./io/inputs_readable/{file.name}",
+            ]
+        )
+
+    def get_file_key(file: Path) -> str:
+        """Get the file key for password lookup."""
+        filename = file.name
+
+        if "BPI" in filename:
+            return "BPI"
+        if "UB REWARDS" in filename:
+            return "UB"
+        
+        raise ValueError(f"File {filename} does not match any known keys.")
+
+    passwords = {
+        "UB": Path("./creds/UB_STATEMENT").read_text(),
+        "BPI": Path("./creds/BPI_STATEMENT").read_text(),
+    }
+
 
     status: set[str] = set()
 
@@ -54,19 +81,13 @@ def process_raw_files(qpdf: str, files: Iterable[Path] | None) -> set | set[str]
         return status
 
     for file in files:
-        filename = str(file)
-        result = subprocess.run(
-            [
-                qpdf,
-                f"--password={pw}",
-                "--decrypt",
-                filename,
-                f"./io/inputs_readable/{file.name}",
-            ]
-        )
+        key = get_file_key(file)
+        pw = passwords[key]
+        result = convert(file, pw)
+        context.log.info(f"{result.returncode=} for file {file.name}")
 
         if not result.returncode:
-            status.add(filename)
+            status.add(str(file))
 
     return status
 
