@@ -44,10 +44,27 @@ def call_gemini_api(file_paths: Iterable, gemini_api_key: str) -> dict[Path, str
     client = Client(api_key=gemini_api_key)
 
     responses = {}
+    
+    prompts = {
+        "BPI": Path("io/prompts/bpi_estatement.txt").read_text(),
+        "UB": Path("io/prompts/ub_statement.txt").read_text(),
+    }
 
-    prompt = Path("io/prompts/bpi_estatement.txt").read_text()
+    def get_prompt_key(file: Path) -> str:
+        """Get the file key for prompt lookup."""
+        filename = file.name
+
+        if "BPI" in filename:
+            return "BPI"
+        if "UB REWARDS" in filename:
+            return "UB"
+        
+        raise ValueError(f"File {filename} does not match any known keys.")
+
 
     for file in file_paths:
+        key = get_prompt_key(file)
+        prompt = prompts[key]
         requestor = GeminiRequestor(prompt=prompt, file_path=file, client=client)
 
         requestor.send_request()
