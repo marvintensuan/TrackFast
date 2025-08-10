@@ -41,7 +41,7 @@ def get_unprocessed_readable_files() -> set[Path]:
 def call_gemini_api(file_paths: Iterable, gemini_api_key: str) -> dict[Path, str]:
     """Sends files to the Gemini API for processing and retrieves responses."""
 
-    client = Client(api_key=gemini_api_key)
+    client = Client(api_key=gemini_api_key, model="gemini-2.5-flash")
 
     responses = {}
     
