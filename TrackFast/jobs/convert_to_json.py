@@ -26,25 +26,43 @@ def gemini_api_key() -> str:
 
 
 @op(out={"result": Out(dagster_type=set)})
-def get_unprocessed_readable_files() -> set[Path]:
+def get_unprocessed_readable_files(context) -> set[Path]:
     """Return a list of files from `inputs_readable` that haven't been processed yet."""
     readable_files = get_input_files("io/inputs_readable")
 
     contents = read_file_safely("io/outputs/files_processed_by_gemini.json")
     processed_files: list[str] = json.loads(contents)
-    existing_files: set[Path] = {Path(file) for file in processed_files}
+    existing_files: set[Path] = {
+        Path("io/inputs_readable") / file for file in processed_files
+    }
 
-    return readable_files - existing_files
+    context.log.info(f"All files: {readable_files=}")
+    context.log.info(f"Existing files: {existing_files=}")
+
+    files_to_process = readable_files - existing_files
+
+    if files_to_process:
+        context.log.info(f"Files to process: {files_to_process=}")
+    else:
+        context.log.info("No files to process.")
+
+    return files_to_process
 
 
 @op(ins={"file_paths": In(dagster_type=set)})
-def call_gemini_api(context, file_paths: Iterable, gemini_api_key: str) -> dict[Path, str]:
+def call_gemini_api(
+    context, file_paths: Iterable, gemini_api_key: str
+) -> dict[Path, str]:
     """Sends files to the Gemini API for processing and retrieves responses."""
+
+    if not file_paths:
+        context.log.info("No files to process.")
+        return {}
 
     client = Client(api_key=gemini_api_key)
 
     responses = {}
-    
+
     prompts = {
         "BPI": Path("io/prompts/bpi_estatement.txt").read_text(),
         "UB": Path("io/prompts/ub_statement.txt").read_text(),
@@ -58,15 +76,16 @@ def call_gemini_api(context, file_paths: Iterable, gemini_api_key: str) -> dict[
             return "BPI"
         if "UB REWARDS" in filename:
             return "UB"
-        
-        raise ValueError(f"File {filename} does not match any known keys.")
 
+        raise ValueError(f"File {filename} does not match any known keys.")
 
     for file in file_paths:
         context.log.info(f"Sending file to Gemini: {file.name}...")
         key = get_prompt_key(file)
         prompt = prompts[key]
-        requestor = GeminiRequestor(prompt=prompt, file_path=file, client=client, model="gemini-2.5-flash")
+        requestor = GeminiRequestor(
+            prompt=prompt, file_path=file, client=client, model="gemini-2.5-flash"
+        )
 
         requestor.send_request()
 
