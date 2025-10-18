@@ -66,11 +66,14 @@ def process_raw_files(context, qpdf: str, files: Iterable[Path] | None) -> set |
             return "BPI"
         if "UB REWARDS" in filename:
             return "UB"
+        if "UB_MC201" in filename:
+            return "UB2"
         
         raise ValueError(f"File {filename} does not match any known keys.")
 
     passwords = {
         "UB": Path("./creds/UB_STATEMENT").read_text(),
+        "UB2": Path("./creds/UB_STATEMENT2").read_text(),
         "BPI": Path("./creds/BPI_STATEMENT").read_text(),
     }
 

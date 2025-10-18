@@ -71,10 +71,12 @@ def call_gemini_api(
     def get_prompt_key(file: Path) -> str:
         """Get the file key for prompt lookup."""
         filename = file.name
-
+        context.log.info(f"Determining prompt for file: {filename}")
         if "BPI" in filename:
             return "BPI"
         if "UB REWARDS" in filename:
+            return "UB"
+        if "UB_MC201" in filename:
             return "UB"
 
         raise ValueError(f"File {filename} does not match any known keys.")
