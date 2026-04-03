@@ -7,7 +7,13 @@ import polars as pl
 
 
 def _sha256_concat(row) -> str:
-    concat = f"{row['Provider']}{row['Date']}{row['Transaction']}{row['Amount']}"
+    concat = (
+        f"{row['index']}"
+        f"{row['Provider']}"
+        f"{row['Date']}"
+        f"{row['Transaction']}"
+        f"{row['Amount']}"
+    )
     return hashlib.sha256(concat.encode("utf-8")).hexdigest()
 
 
@@ -36,16 +42,21 @@ def concatenate_json_files(context, files: list[Path]) -> pl.DataFrame:
 
 @op
 def assign_unique_ids(transactions: pl.DataFrame) -> pl.DataFrame:
-    """Assign unique IDs to each transaction based on its content,
+    """Assign unique IDs to each transaction based on its content + row index,
     placing the `id` column first."""
 
-    transactions_with_id = transactions.with_columns(
-        pl.struct(["Provider", "Date", "Transaction", "Amount"])
-        .map_elements(_sha256_concat)
-        .alias("id")
+    transactions = transactions.sort(["Date", "Transaction", "Amount"])
+
+    transactions_with_id = (
+        transactions.with_row_count("index")
+        .with_columns(
+            pl.struct(["index", "Provider", "Date", "Transaction", "Amount"])
+            .map_elements(_sha256_concat)
+            .alias("id")
+        )
+        .drop("index")
     )
 
-    # Reorder columns so that `id` comes first
     cols = ["id"] + [c for c in transactions_with_id.columns if c != "id"]
     return transactions_with_id.select(cols)
 
