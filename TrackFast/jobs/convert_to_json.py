@@ -118,7 +118,7 @@ def store_gemini_results(results: dict) -> None:
         if contents:
             old_data = set(json.loads(contents))
 
-    stringify = {str(file.stem) for file in results.keys()}
+    stringify = {str(file.name) for file in results.keys()}
 
     write_all_processed_files(
         file_name=path,
