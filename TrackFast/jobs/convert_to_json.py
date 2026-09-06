@@ -86,7 +86,7 @@ def call_gemini_api(
         key = get_prompt_key(file)
         prompt = prompts[key]
         requestor = GeminiRequestor(
-            prompt=prompt, file_path=file, client=client, model="gemini-2.5-flash"
+            prompt=prompt, file_path=file, client=client, model="gemini-3.5-flash"
         )
 
         requestor.send_request()
